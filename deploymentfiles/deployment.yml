@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
       - name: mc-app
-        image: umaranidommati/uma:mindcircuit13img
+        image: umaranidommati/uma:pythonappln
         ports:
         - containerPort: 8080
 
