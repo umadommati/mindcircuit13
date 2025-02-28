@@ -1,0 +1,74 @@
+pipeline {
+    agent any
+
+    tools {
+        maven 'maven3'
+    }
+
+    stages {
+        stage('Checkout Code') {
+            steps {
+                echo 'Cloning GitHub Repo'
+                git branch: 'main', url: 'https://github.com/umadommati/mindcircuit13.git'
+            }
+        }
+
+        stage('SonarQube Scan') {
+            steps {
+                echo 'Scanning Project with SonarQube'
+                sh 'ls -ltr'
+
+                sh '''
+                mvn sonar:sonar \
+                -Dsonar.host.url=http://3.133.150.90:9000 \
+                -Dsonar.login=squ_0b012d9b09b49f1bc177a619898e9f9074c8d9f5
+                '''
+            }
+        }
+
+        stage('Build Artifact') {
+            steps {
+                echo 'Building Maven Artifact'
+                sh 'mvn clean package' 
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                echo 'Building Docker Image'
+                sh 'docker build -t umaranidommati/uma:${BUILD_NUMBER} .'
+            }
+        }
+
+        stage('Push Docker Image to Docker Hub') {
+            steps {
+                script {
+                    withCredentials([string(credentialsId: 'dockerhub', variable: 'dockerhub')]) {
+                        sh 'docker login -u umaranidommati -p ${dockerhub}'
+                        sh 'docker push umaranidommati/uma:${BUILD_NUMBER}'
+                    }
+                }
+            }
+        }
+
+        stage('Update Deployment File & Push to GitHub') {
+            environment {
+                GIT_REPO_NAME = "mindcircuit13"
+                GIT_USER_NAME = "umadommati"
+            }
+            steps {
+                echo 'Updating Deployment File'
+                withCredentials([string(credentialsId: 'githubtoken', variable: 'githubtoken')]) {
+                    sh '''
+                    git config user.email "umaranidommati2@gmail.com"
+                    git config user.name "Umarani"
+                    sed -i "s/uma:.*/uma:${BUILD_NUMBER}/g" deploymentfiles/deployment.yml
+                    git add .
+                    git commit -m "Update deployment image to version ${B_practUILD_NUMBER}"
+                    git push https://${githubtoken}@github.com/${GIT_USER_NAME}/${GIT_REPO_NAME} HEAD:main
+                    '''
+                }
+            }
+        }
+    }
+}
